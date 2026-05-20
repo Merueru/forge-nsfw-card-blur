@@ -11,7 +11,6 @@ This extension does not analyze generated images and does not filter your output
 - Blur, hide, or show marked Extra Networks card thumbnails.
 - Hover a blurred card to temporarily reveal it.
 - Mark individual cards from the card metadata popup with a compact `NSFW blur on/off` toggle.
-- Keep the original path-based behavior: cards with model or preview paths containing `nsfw` are also treated as NSFW.
 - Save per-card choices on the Forge machine in `data/marked_cards.json`, not in browser local storage.
 - Use a small Extra Networks toolbar button to switch between `Blur`, `Hide`, and `Show` modes.
 
@@ -77,7 +76,7 @@ Restart the WebUI after installation.
 
 Based on [CurtisDS/stupid-nsfw-card-blur-a1111](https://github.com/CurtisDS/stupid-nsfw-card-blur-a1111).
 
-Original project by CurtisDS. This version keeps the original lightweight blur/hide/show behavior and adds per-card metadata toggles, machine-local JSON storage, and Forge-focused UI polish.
+Original project by CurtisDS. This version keeps the lightweight blur/hide/show behavior and adds explicit per-card metadata toggles, machine-local JSON storage, and Forge-focused UI polish.
 
 Some toolbar/blur/show demo images are based on the original project preview assets and are kept under the same MIT license. Replace them with new screenshots any time.
 
