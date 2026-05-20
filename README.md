@@ -41,6 +41,10 @@ Marked cards are blurred. Hovering over a blurred card temporarily reveals the t
 
 ![Blur mode](images/fncbgif002.gif)
 
+## Hide
+
+![hide mode](images/fncbgif001.png)
+
 ## Show
 
 All card thumbnails are shown normally.
