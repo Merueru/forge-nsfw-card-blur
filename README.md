@@ -83,4 +83,4 @@ Some toolbar/blur/show demo images are based on the original project preview ass
 
 ## License
 
-MIT License. See [LICENSE.txt](LICENSE).
+MIT License. See [LICENSE](LICENSE).
