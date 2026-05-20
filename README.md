@@ -43,6 +43,8 @@ Marked cards are blurred. Hovering over a blurred card temporarily reveals the t
 
 ## Hide
 
+Marked cards are hidden completely. Hovering over the card will not reveal the thumbnail.
+
 ![hide mode](images/fncbgif001.png)
 
 ## Show
@@ -81,4 +83,4 @@ Some toolbar/blur/show demo images are based on the original project preview ass
 
 ## License
 
-MIT License. See [LICENSE.txt](LICENSE.txt).
+MIT License. See [LICENSE.txt](LICENSE).
