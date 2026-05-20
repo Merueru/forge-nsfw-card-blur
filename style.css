@@ -1,16 +1,12 @@
-.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card .preview[src*="nsfw" i],
 .extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur] .preview {
 	filter: blur(20px);
 	transition: 0.15s filter cubic-bezier(.79,.14,.15,.86);
 }
 
-.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card:hover .preview[src*="nsfw" i],
 .extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur]:hover .preview {
 	filter: blur(0px);
 }
 
-.extra-networks:not([nsfw-setting]) .extra-network-pane .card .preview[src*="nsfw" i],
-.extra-networks[nsfw-setting="Hide"] .extra-network-pane .card .preview[src*="nsfw" i],
 .extra-networks:not([nsfw-setting]) .extra-network-pane .card[data-nsfw-card-blur] .preview,
 .extra-networks[nsfw-setting="Hide"] .extra-network-pane .card[data-nsfw-card-blur] .preview {
 	display: none;
