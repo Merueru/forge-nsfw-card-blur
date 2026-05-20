@@ -39,7 +39,7 @@ Use the Extra Networks toolbar button to switch between blur, hide, and show beh
 
 Marked cards are blurred. Hovering over a blurred card temporarily reveals the thumbnail.
 
-![Blur mode](images/fncbgif001.png)
+![Blur mode](images/fncbgif002.gif)
 
 ## Show
 
