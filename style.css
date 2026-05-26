@@ -1,14 +1,44 @@
 .extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur] .preview {
-	filter: blur(20px);
-	transition: 0.15s filter cubic-bezier(.79,.14,.15,.86);
+	filter: none;
 }
 
-.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur]:hover .preview {
-	filter: blur(0px);
+.extra-network-pane .card > .nsfw-card-blurred-preview {
+	display: none;
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	pointer-events: none;
+}
+
+.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur][data-nsfw-blurred-preview-active] > .preview {
+	visibility: hidden;
+}
+
+.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur][data-nsfw-blurred-preview-active] > .nsfw-card-blurred-preview {
+	display: block;
+}
+
+.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur][data-nsfw-blurred-preview-active]:hover > .preview {
+	visibility: visible;
+}
+
+.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur][data-nsfw-blurred-preview-active]:hover > .nsfw-card-blurred-preview {
+	display: none;
+}
+
+.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur][data-nsfw-blur-fallback] .preview {
+	filter: blur(12px);
+}
+
+.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur][data-nsfw-blur-fallback]:hover .preview {
+	filter: none;
 }
 
 .extra-networks:not([nsfw-setting]) .extra-network-pane .card[data-nsfw-card-blur] .preview,
-.extra-networks[nsfw-setting="Hide"] .extra-network-pane .card[data-nsfw-card-blur] .preview {
+.extra-networks[nsfw-setting="Hide"] .extra-network-pane .card[data-nsfw-card-blur] .preview,
+.extra-networks[nsfw-setting="Hide"] .extra-network-pane .card[data-nsfw-card-blur] > .nsfw-card-blurred-preview {
 	display: none;
 }
 
