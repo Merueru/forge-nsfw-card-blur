@@ -5,8 +5,15 @@ const nsfwh = {
 	storageLoaded: false,
 	storageLoadPromise: null,
 	markedCards: new Set(),
+	markedVersion: 0,
+	refreshQueued: false,
+	observerStarted: false,
+	lastCardSignature: "",
+	lastAppliedMarkedVersion: -1,
+	lastAppliedViewOption: "",
 	endpoints: {
 		marked: "/nsfw-card-blur/marked",
+		blurredPreview: "/nsfw-card-blur/blurred-preview",
 	},
 
 	setAttributes: () => {
@@ -17,6 +24,7 @@ const nsfwh = {
 			});
 		}
 		nsfwh.attributesAdded = true;
+		nsfwh.scheduleRefresh(true);
 	},
 
 	cardKey: (page, name) => {
@@ -58,11 +66,13 @@ const nsfwh = {
 
 				nsfwh.markedCards = new Set(Array.isArray(data.marked) ? data.marked : []);
 				nsfwh.storageLoaded = true;
+				nsfwh.markedVersion += 1;
 				return Array.from(nsfwh.markedCards);
 			} catch(error) {
 				console.warn("[NSFWCardBlur] Marked-card storage is unavailable", error);
 				nsfwh.markedCards = new Set();
 				nsfwh.storageLoaded = true;
+				nsfwh.markedVersion += 1;
 				return [];
 			} finally {
 				nsfwh.storageLoadPromise = null;
@@ -80,8 +90,9 @@ const nsfwh = {
 		} else {
 			nsfwh.markedCards.delete(key);
 		}
+		nsfwh.markedVersion += 1;
 
-		nsfwh.applyMarkedCards();
+		nsfwh.applyMarkedCards(true);
 
 		const response = await fetch(nsfwh.endpoints.marked, {
 			method: "POST",
@@ -91,14 +102,201 @@ const nsfwh = {
 		const data = await response.json();
 		if(!response.ok || !data.ok) throw new Error(data.error || response.statusText);
 		nsfwh.markedCards = new Set(Array.isArray(data.marked) ? data.marked : []);
-		nsfwh.applyMarkedCards();
+		nsfwh.markedVersion += 1;
+		nsfwh.applyMarkedCards(true);
 	},
 
-	applyMarkedCards: () => {
-		gradioApp().querySelectorAll(".extra-network-pane .card[data-name]").forEach(card => {
-			const key = nsfwh.keyFromCard(card);
-			card.toggleAttribute("data-nsfw-card-blur", nsfwh.markedCards.has(key));
+	cardSignature: (cards) => {
+		if(!cards.length) return "0";
+		return cards.map(card => {
+			const preview = nsfwh.cardPreviewElement(card);
+			const previewSrc = preview ? nsfwh.normalizePreviewSource(preview) : "";
+			return `${card.closest(".extra-network-cards[id]")?.id || ""}:${nsfwh.keyFromCard(card)}:${previewSrc}`;
+		}).join("|");
+	},
+
+	previewSourceFromCard: (card) => {
+		const preview = nsfwh.cardPreviewElement(card);
+		if(!preview) return null;
+
+		const currentSrc = nsfwh.normalizePreviewSource(preview);
+		return preview.dataset.nsfwOriginalSrc || currentSrc;
+	},
+
+	cardPreviewElement: (card) => {
+		return Array.from(card.children).find(child => {
+			return child.classList && child.classList.contains("preview") && !child.classList.contains("nsfw-card-blurred-preview");
+		}) || null;
+	},
+
+	isBlurredPreviewUrl: (src) => {
+		try {
+			return new URL(src, window.location.href).pathname.endsWith("/nsfw-card-blur/blurred-preview");
+		} catch(error) {
+			return false;
+		}
+	},
+
+	originalPreviewUrlFromBlurred: (src) => {
+		try {
+			const url = new URL(src, window.location.href);
+			if(!url.pathname.endsWith("/nsfw-card-blur/blurred-preview")) return "";
+
+			const filename = url.searchParams.get("filename");
+			if(!filename) return "";
+
+			const params = new URLSearchParams();
+			params.set("filename", filename);
+			const mtime = url.searchParams.get("mtime");
+			if(mtime) params.set("mtime", mtime);
+
+			return `./sd_extra_networks/thumb?${params.toString()}`;
+		} catch(error) {
+			return "";
+		}
+	},
+
+	normalizePreviewSource: (preview) => {
+		const currentSrc = preview.getAttribute("src") || "";
+		const restoredSrc = nsfwh.originalPreviewUrlFromBlurred(currentSrc);
+		if(restoredSrc) {
+			preview.setAttribute("src", restoredSrc);
+			preview.dataset.nsfwOriginalSrc = restoredSrc;
+			preview.dataset.nsfwBlurredSrc = "";
+			return restoredSrc;
+		}
+
+		return currentSrc;
+	},
+
+	blurredPreviewUrl: (src) => {
+		try {
+			const url = new URL(src, window.location.href);
+			if(!url.pathname.endsWith("/sd_extra_networks/thumb")) return "";
+
+			const filename = url.searchParams.get("filename");
+			if(!filename) return "";
+
+			const params = new URLSearchParams();
+			params.set("filename", filename);
+			const mtime = url.searchParams.get("mtime");
+			if(mtime) params.set("mtime", mtime);
+
+			return `${nsfwh.endpoints.blurredPreview}?${params.toString()}`;
+		} catch(error) {
+			return "";
+		}
+	},
+
+	restoreOriginalPreview: (card) => {
+		const preview = nsfwh.cardPreviewElement(card);
+		if(preview) nsfwh.normalizePreviewSource(preview);
+
+		card.removeAttribute("data-nsfw-blurred-preview-active");
+		card.removeAttribute("data-nsfw-blur-fallback");
+	},
+
+	ensureBlurredOverlay: (card) => {
+		let overlay = Array.from(card.children).find(child => child.classList && child.classList.contains("nsfw-card-blurred-preview"));
+		if(overlay) return overlay;
+
+		overlay = document.createElement("img");
+		overlay.className = "nsfw-card-blurred-preview";
+		overlay.loading = "lazy";
+		overlay.alt = "";
+		overlay.setAttribute("aria-hidden", "true");
+
+		const preview = nsfwh.cardPreviewElement(card);
+		if(preview) {
+			preview.insertAdjacentElement("afterend", overlay);
+		} else {
+			card.prepend(overlay);
+		}
+
+		return overlay;
+	},
+
+	applyBlurredPreview: (card) => {
+		const preview = nsfwh.cardPreviewElement(card);
+		if(!preview) return;
+
+		const originalSrc = nsfwh.previewSourceFromCard(card);
+		if(!originalSrc) return;
+
+		if(preview.dataset.nsfwOriginalSrc !== originalSrc) {
+			preview.dataset.nsfwOriginalSrc = originalSrc;
+			preview.dataset.nsfwBlurredSrc = "";
+		}
+
+		if(!preview.dataset.nsfwBlurredSrc) {
+			preview.dataset.nsfwBlurredSrc = nsfwh.blurredPreviewUrl(originalSrc);
+		}
+
+		if(!preview.dataset.nsfwBlurredSrc) {
+			card.setAttribute("data-nsfw-blur-fallback", "");
+			card.removeAttribute("data-nsfw-blurred-preview-active");
+			return;
+		}
+
+		const overlay = nsfwh.ensureBlurredOverlay(card);
+		if(overlay.getAttribute("src") !== preview.dataset.nsfwBlurredSrc) {
+			overlay.setAttribute("src", preview.dataset.nsfwBlurredSrc);
+		}
+		card.removeAttribute("data-nsfw-blur-fallback");
+		card.setAttribute("data-nsfw-blurred-preview-active", "");
+	},
+
+	bindCardReveal: (card) => {
+		if(card.dataset.nsfwRevealBound) return;
+
+		card.addEventListener("mouseenter", () => {
+			if(nsfwh.currentViewOption === "Blur" && card.hasAttribute("data-nsfw-card-blur")) {
+				nsfwh.restoreOriginalPreview(card);
+			}
 		});
+		card.addEventListener("mouseleave", () => {
+			if(nsfwh.currentViewOption === "Blur" && card.hasAttribute("data-nsfw-card-blur")) {
+				nsfwh.applyBlurredPreview(card);
+			}
+		});
+		card.dataset.nsfwRevealBound = "true";
+	},
+
+	updateCardPreview: (card, marked) => {
+		nsfwh.bindCardReveal(card);
+
+		if(!marked || nsfwh.currentViewOption !== "Blur") {
+			nsfwh.restoreOriginalPreview(card);
+			return;
+		}
+
+		if(!card.matches(":hover")) {
+			nsfwh.applyBlurredPreview(card);
+		}
+	},
+
+	applyMarkedCards: (force = false) => {
+		const cards = Array.from(gradioApp().querySelectorAll(".extra-network-pane .card[data-name]"));
+		const signature = nsfwh.cardSignature(cards);
+		if(
+			!force &&
+			signature === nsfwh.lastCardSignature &&
+			nsfwh.markedVersion === nsfwh.lastAppliedMarkedVersion &&
+			nsfwh.currentViewOption === nsfwh.lastAppliedViewOption
+		) {
+			return;
+		}
+
+		cards.forEach(card => {
+			const key = nsfwh.keyFromCard(card);
+			const marked = nsfwh.markedCards.has(key);
+			card.toggleAttribute("data-nsfw-card-blur", marked);
+			nsfwh.updateCardPreview(card, marked);
+		});
+
+		nsfwh.lastCardSignature = signature;
+		nsfwh.lastAppliedMarkedVersion = nsfwh.markedVersion;
+		nsfwh.lastAppliedViewOption = nsfwh.currentViewOption;
 	},
 
 	updateEditorToggle: (editor) => {
@@ -179,6 +377,46 @@ const nsfwh = {
 
 			nsfwh.updateEditorToggle(editor);
 		});
+	},
+
+	sanitizeStandalonePreviews: () => {
+		gradioApp().querySelectorAll(".standalone-card-preview .preview").forEach(preview => {
+			nsfwh.normalizePreviewSource(preview);
+		});
+	},
+
+	scheduleRefresh: (force = false) => {
+		if(force) {
+			nsfwh.lastCardSignature = "";
+		}
+		if(nsfwh.refreshQueued) return;
+
+		nsfwh.refreshQueued = true;
+		window.requestAnimationFrame(async () => {
+			nsfwh.refreshQueued = false;
+			nsfwh.ensureControlButtons();
+			nsfwh.enhanceMetadataEditors();
+			nsfwh.sanitizeStandalonePreviews();
+			await nsfwh.loadMarkedCards();
+			nsfwh.applyMarkedCards(force);
+			nsfwh.sanitizeStandalonePreviews();
+			nsfwh.enhanceMetadataEditors();
+		});
+	},
+
+	startObserver: () => {
+		if(nsfwh.observerStarted) return;
+
+		const root = gradioApp();
+		if(!root) return;
+
+		const observer = new MutationObserver(mutations => {
+			if(mutations.some(mutation => mutation.addedNodes.length || mutation.removedNodes.length || mutation.type === "attributes")) {
+				nsfwh.scheduleRefresh();
+			}
+		});
+		observer.observe(root, {childList: true, subtree: true, attributes: true, attributeFilter: ["src", "data-name", "id"]});
+		nsfwh.observerStarted = true;
 	},
 
 	extraNetworksControlNSFWModalOpenOnClick: (event) => {
@@ -282,12 +520,8 @@ const nsfwh = {
 };
 
 onAfterUiUpdate(function() {
-	nsfwh.ensureControlButtons();
-	nsfwh.enhanceMetadataEditors();
-	nsfwh.loadMarkedCards().then(() => {
-		nsfwh.applyMarkedCards();
-		nsfwh.enhanceMetadataEditors();
-	});
+	nsfwh.startObserver();
+	nsfwh.scheduleRefresh();
 });
 
 if(typeof onOptionsAvailable === "function") {
