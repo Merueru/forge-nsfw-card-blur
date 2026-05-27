@@ -13,7 +13,6 @@ const nsfwh = {
 	lastAppliedViewOption: "",
 	endpoints: {
 		marked: "/nsfw-card-blur/marked",
-		blurredPreview: "/nsfw-card-blur/blurred-preview",
 	},
 
 	setAttributes: () => {
@@ -115,26 +114,10 @@ const nsfwh = {
 		}).join("|");
 	},
 
-	previewSourceFromCard: (card) => {
-		const preview = nsfwh.cardPreviewElement(card);
-		if(!preview) return null;
-
-		const currentSrc = nsfwh.normalizePreviewSource(preview);
-		return preview.dataset.nsfwOriginalSrc || currentSrc;
-	},
-
 	cardPreviewElement: (card) => {
 		return Array.from(card.children).find(child => {
-			return child.classList && child.classList.contains("preview") && !child.classList.contains("nsfw-card-blurred-preview");
+			return child.classList && child.classList.contains("preview");
 		}) || null;
-	},
-
-	isBlurredPreviewUrl: (src) => {
-		try {
-			return new URL(src, window.location.href).pathname.endsWith("/nsfw-card-blur/blurred-preview");
-		} catch(error) {
-			return false;
-		}
 	},
 
 	originalPreviewUrlFromBlurred: (src) => {
@@ -169,113 +152,27 @@ const nsfwh = {
 		return currentSrc;
 	},
 
-	blurredPreviewUrl: (src) => {
-		try {
-			const url = new URL(src, window.location.href);
-			if(!url.pathname.endsWith("/sd_extra_networks/thumb")) return "";
-
-			const filename = url.searchParams.get("filename");
-			if(!filename) return "";
-
-			const params = new URLSearchParams();
-			params.set("filename", filename);
-			const mtime = url.searchParams.get("mtime");
-			if(mtime) params.set("mtime", mtime);
-
-			return `${nsfwh.endpoints.blurredPreview}?${params.toString()}`;
-		} catch(error) {
-			return "";
-		}
-	},
-
-	restoreOriginalPreview: (card) => {
+	cleanupCardPreview: (card) => {
 		const preview = nsfwh.cardPreviewElement(card);
-		if(preview) nsfwh.normalizePreviewSource(preview);
+		if(preview) {
+			nsfwh.normalizePreviewSource(preview);
+			delete preview.dataset.nsfwOriginalSrc;
+			delete preview.dataset.nsfwBlurredSrc;
+		}
 
 		card.removeAttribute("data-nsfw-blurred-preview-active");
 		card.removeAttribute("data-nsfw-blur-fallback");
-	},
-
-	ensureBlurredOverlay: (card) => {
-		let overlay = Array.from(card.children).find(child => child.classList && child.classList.contains("nsfw-card-blurred-preview"));
-		if(overlay) return overlay;
-
-		overlay = document.createElement("img");
-		overlay.className = "nsfw-card-blurred-preview";
-		overlay.loading = "lazy";
-		overlay.alt = "";
-		overlay.setAttribute("aria-hidden", "true");
-
-		const preview = nsfwh.cardPreviewElement(card);
-		if(preview) {
-			preview.insertAdjacentElement("afterend", overlay);
-		} else {
-			card.prepend(overlay);
-		}
-
-		return overlay;
-	},
-
-	applyBlurredPreview: (card) => {
-		const preview = nsfwh.cardPreviewElement(card);
-		if(!preview) return;
-
-		const originalSrc = nsfwh.previewSourceFromCard(card);
-		if(!originalSrc) return;
-
-		if(preview.dataset.nsfwOriginalSrc !== originalSrc) {
-			preview.dataset.nsfwOriginalSrc = originalSrc;
-			preview.dataset.nsfwBlurredSrc = "";
-		}
-
-		if(!preview.dataset.nsfwBlurredSrc) {
-			preview.dataset.nsfwBlurredSrc = nsfwh.blurredPreviewUrl(originalSrc);
-		}
-
-		if(!preview.dataset.nsfwBlurredSrc) {
-			card.setAttribute("data-nsfw-blur-fallback", "");
-			card.removeAttribute("data-nsfw-blurred-preview-active");
-			return;
-		}
-
-		const overlay = nsfwh.ensureBlurredOverlay(card);
-		if(overlay.getAttribute("src") !== preview.dataset.nsfwBlurredSrc) {
-			overlay.setAttribute("src", preview.dataset.nsfwBlurredSrc);
-		}
-		card.removeAttribute("data-nsfw-blur-fallback");
-		card.setAttribute("data-nsfw-blurred-preview-active", "");
-	},
-
-	bindCardReveal: (card) => {
-		if(card.dataset.nsfwRevealBound) return;
-
-		card.addEventListener("mouseenter", () => {
-			if(nsfwh.currentViewOption === "Blur" && card.hasAttribute("data-nsfw-card-blur")) {
-				nsfwh.restoreOriginalPreview(card);
-			}
-		});
-		card.addEventListener("mouseleave", () => {
-			if(nsfwh.currentViewOption === "Blur" && card.hasAttribute("data-nsfw-card-blur")) {
-				nsfwh.applyBlurredPreview(card);
-			}
-		});
-		card.dataset.nsfwRevealBound = "true";
+		card.style.removeProperty("--nsfw-card-blurred-preview");
 	},
 
 	updateCardPreview: (card, marked) => {
-		nsfwh.bindCardReveal(card);
+		nsfwh.cleanupCardPreview(card);
 
-		if(!marked || nsfwh.currentViewOption !== "Blur") {
-			nsfwh.restoreOriginalPreview(card);
-			return;
-		}
-
-		if(!card.matches(":hover")) {
-			nsfwh.applyBlurredPreview(card);
-		}
+		card.removeAttribute("data-nsfw-card-cover");
 	},
 
 	applyMarkedCards: (force = false) => {
+		nsfwh.removeLegacyBlurredOverlays();
 		const cards = Array.from(gradioApp().querySelectorAll(".extra-network-pane .card[data-name]"));
 		const signature = nsfwh.cardSignature(cards);
 		if(
@@ -385,6 +282,12 @@ const nsfwh = {
 		});
 	},
 
+	removeLegacyBlurredOverlays: () => {
+		gradioApp().querySelectorAll(".extra-network-pane .card > .nsfw-card-blurred-preview").forEach(overlay => {
+			overlay.remove();
+		});
+	},
+
 	scheduleRefresh: (force = false) => {
 		if(force) {
 			nsfwh.lastCardSignature = "";
@@ -396,6 +299,7 @@ const nsfwh = {
 			nsfwh.refreshQueued = false;
 			nsfwh.ensureControlButtons();
 			nsfwh.enhanceMetadataEditors();
+			nsfwh.removeLegacyBlurredOverlays();
 			nsfwh.sanitizeStandalonePreviews();
 			await nsfwh.loadMarkedCards();
 			nsfwh.applyMarkedCards(force);
