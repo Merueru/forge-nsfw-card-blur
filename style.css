@@ -1,14 +1,10 @@
-.extra-network-pane .card > .nsfw-card-blurred-preview {
-	display: none !important;
-}
-
-.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur] .preview {
+.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur][data-nsfw-card-visible] .preview {
 	filter: blur(8px) brightness(0.24) saturate(0);
 	transform: scale(1.035);
 	transform-origin: center;
 }
 
-.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur]:hover .preview {
+.extra-networks[nsfw-setting="Blur"] .extra-network-pane .card[data-nsfw-card-blur][data-nsfw-card-visible]:hover .preview {
 	filter: none;
 	transform: none;
 }
