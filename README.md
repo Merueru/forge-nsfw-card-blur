@@ -60,13 +60,13 @@ All card thumbnails are shown normally.
 
 ## Storage
 
-Per-card markers are stored here:
+Only the list of cards you marked for blur/hide is stored here:
 
 ```text
 data/marked_cards.json
 ```
 
-The blur effect is only used for the Extra Networks thumbnail UI. It does not replace your original preview images and does not affect generated output images. The `data/` folder is ignored by git so personal card choices are not published with the extension.
+The blur effect itself is real-time CSS only. It does not create preview caches, replace your original preview images, or affect generated output images. The `data/` folder is ignored by git so personal card choices are not published with the extension.
 
 ## Installation
 
