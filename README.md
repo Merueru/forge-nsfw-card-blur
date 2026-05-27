@@ -80,7 +80,7 @@ Restart the WebUI after installation.
 
 ## Credits
 
-Based on [CurtisDS/stupid-nsfw-card-blur-a1111](https://github.com/CurtisDS/stupid-nsfw-card-blur-a1111).
+Based on [CurtisDS/stupid-nsfw-card-blur-a1111](https://github.com/CurtisDS/stupid-nsfw-card-blur-a1111)
 
 Original project by CurtisDS. This version keeps the lightweight blur/hide/show behavior and adds explicit per-card metadata toggles, machine-local JSON storage, a lighter viewport-aware real-time blur preview mode, and Forge-focused UI polish.
 
@@ -88,4 +88,4 @@ Some toolbar/blur/show demo images are based on the original project preview ass
 
 ## License
 
-MIT License. See [LICENSE.txt](LICENSE.txt).
+MIT License. See [LICENSE](LICENSE)
