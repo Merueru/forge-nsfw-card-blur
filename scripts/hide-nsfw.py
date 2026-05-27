@@ -83,6 +83,7 @@ def ensure_storage_file():
 	if not os.path.exists(MARKED_PATH):
 		write_marked([])
 
+
 def on_ui_settings():
 	section = ('nsfw_card_blur', "Forge NSFW Card Blur")
 	shared.opts.add_option("nsfw_card_blur_default", shared.OptionInfo("Blur", "Default NSFW filter setting", gr.Radio, {"choices": ["Blur", "Hide", "Show"]}, section=section))
