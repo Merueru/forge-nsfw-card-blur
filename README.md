@@ -10,6 +10,7 @@ This extension does not analyze generated images and does not filter your output
 
 - Blur, hide, or show marked Extra Networks card thumbnails.
 - Use a lighter real-time blur, darken, and desaturate preview in Blur mode instead of applying a very heavy browser blur filter to every marked card while scrolling.
+- Apply the blur effect only to visible card thumbnails, so off-screen cards do not pay the filter cost until they scroll into view.
 - Hover a blurred card to temporarily reveal the original thumbnail.
 - Mark individual cards from the card metadata popup with a compact `NSFW blur on/off` toggle.
 - Save per-card choices on the Forge machine in `data/marked_cards.json`, not in browser local storage.
@@ -37,9 +38,11 @@ Use the Extra Networks toolbar button to switch between blur, hide, and show beh
 
 ## Blur
 
-Marked cards use a lighter real-time CSS filter (`blur(8px) brightness(0.24) saturate(0)`) instead of the older strong blur. The original thumbnail stays in the card and is not replaced, so the Extra Networks metadata editor still sees the normal preview image.
+Marked cards use a lighter real-time CSS filter (`blur(8px) brightness(0.24) saturate(0)`) instead of the older strong blur. The filter is only enabled for card thumbnails that are in or near the viewport. The original thumbnail stays in the card and is not replaced, so the Extra Networks metadata editor still sees the normal preview image.
 
 Hovering over a blurred card temporarily reveals the original thumbnail, so browsing keeps the old behavior while avoiding the cost of strongly blurring many thumbnails during scroll.
+
+![Lightweight real-time blur preview](images/fncbnew001.png)
 
 ![Blur mode](images/fncbgif002.gif)
 
@@ -79,7 +82,7 @@ Restart the WebUI after installation.
 
 Based on [CurtisDS/stupid-nsfw-card-blur-a1111](https://github.com/CurtisDS/stupid-nsfw-card-blur-a1111).
 
-Original project by CurtisDS. This version keeps the lightweight blur/hide/show behavior and adds explicit per-card metadata toggles, machine-local JSON storage, a lighter real-time blur preview mode, and Forge-focused UI polish.
+Original project by CurtisDS. This version keeps the lightweight blur/hide/show behavior and adds explicit per-card metadata toggles, machine-local JSON storage, a lighter viewport-aware real-time blur preview mode, and Forge-focused UI polish.
 
 Some toolbar/blur/show demo images are based on the original project preview assets and are kept under the same MIT license. Replace them with new screenshots any time.
 
