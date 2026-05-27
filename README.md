@@ -9,7 +9,7 @@ This extension does not analyze generated images and does not filter your output
 ## Features
 
 - Blur, hide, or show marked Extra Networks card thumbnails.
-- Use cached low-resolution blurred previews in Blur mode, which avoids applying a live browser blur filter to every marked card while scrolling.
+- Use a lighter real-time blur, darken, and desaturate preview in Blur mode instead of applying a very heavy browser blur filter to every marked card while scrolling.
 - Hover a blurred card to temporarily reveal the original thumbnail.
 - Mark individual cards from the card metadata popup with a compact `NSFW blur on/off` toggle.
 - Save per-card choices on the Forge machine in `data/marked_cards.json`, not in browser local storage.
@@ -23,7 +23,7 @@ Open an Extra Networks card metadata popup, then toggle `NSFW blur on/off` below
 
 The global toolbar mode controls how marked cards behave:
 
-- `Blur`: show a cached blurred preview for marked thumbnails. Hovering over the card reveals the original thumbnail.
+- `Blur`: blur, darken, and desaturate marked thumbnails. Hovering over the card reveals the original thumbnail.
 - `Hide`: hide marked thumbnails entirely.
 - `Show`: show all thumbnails normally.
 
@@ -37,9 +37,9 @@ Use the Extra Networks toolbar button to switch between blur, hide, and show beh
 
 ## Blur
 
-Marked cards use a generated blurred preview image instead of a live CSS blur filter. The first time a marked preview is shown, the extension creates a small blurred JPEG under `data/blurred_previews/`; later views reuse that cache.
+Marked cards use a lighter real-time CSS filter (`blur(8px) brightness(0.24) saturate(0)`) instead of the older strong blur. The original thumbnail stays in the card and is not replaced, so the Extra Networks metadata editor still sees the normal preview image.
 
-If the original preview image changes, the blurred cache key changes too because it includes the preview file path, modified time, and file size. Hovering over a blurred card still swaps back to the original thumbnail, so editing or inspecting a card behaves like the normal Extra Networks view.
+Hovering over a blurred card temporarily reveals the original thumbnail, so browsing keeps the old behavior while avoiding the cost of strongly blurring many thumbnails during scroll.
 
 ![Blur mode](images/fncbgif002.gif)
 
@@ -63,13 +63,7 @@ Per-card markers are stored here:
 data/marked_cards.json
 ```
 
-Blurred preview cache files are stored here:
-
-```text
-data/blurred_previews/
-```
-
-The cache is only used for the Extra Networks thumbnail UI. It does not replace your original preview images and does not affect generated output images. The `data/` folder is ignored by git so personal card choices and cache files are not published with the extension.
+The blur effect is only used for the Extra Networks thumbnail UI. It does not replace your original preview images and does not affect generated output images. The `data/` folder is ignored by git so personal card choices are not published with the extension.
 
 ## Installation
 
@@ -85,7 +79,7 @@ Restart the WebUI after installation.
 
 Based on [CurtisDS/stupid-nsfw-card-blur-a1111](https://github.com/CurtisDS/stupid-nsfw-card-blur-a1111).
 
-Original project by CurtisDS. This version keeps the lightweight blur/hide/show behavior and adds explicit per-card metadata toggles, machine-local JSON storage, cached blurred previews, and Forge-focused UI polish.
+Original project by CurtisDS. This version keeps the lightweight blur/hide/show behavior and adds explicit per-card metadata toggles, machine-local JSON storage, a lighter real-time blur preview mode, and Forge-focused UI polish.
 
 Some toolbar/blur/show demo images are based on the original project preview assets and are kept under the same MIT license. Replace them with new screenshots any time.
 
