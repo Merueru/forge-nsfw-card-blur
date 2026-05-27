@@ -5,12 +5,8 @@ const nsfwh = {
 	storageLoaded: false,
 	storageLoadPromise: null,
 	markedCards: new Set(),
-	markedVersion: 0,
-	refreshQueued: false,
-	observerStarted: false,
-	lastCardSignature: "",
-	lastAppliedMarkedVersion: -1,
-	lastAppliedViewOption: "",
+	viewportObserver: null,
+	observedCards: new WeakSet(),
 	endpoints: {
 		marked: "/nsfw-card-blur/marked",
 	},
@@ -23,7 +19,6 @@ const nsfwh = {
 			});
 		}
 		nsfwh.attributesAdded = true;
-		nsfwh.scheduleRefresh(true);
 	},
 
 	cardKey: (page, name) => {
@@ -65,13 +60,11 @@ const nsfwh = {
 
 				nsfwh.markedCards = new Set(Array.isArray(data.marked) ? data.marked : []);
 				nsfwh.storageLoaded = true;
-				nsfwh.markedVersion += 1;
 				return Array.from(nsfwh.markedCards);
 			} catch(error) {
 				console.warn("[NSFWCardBlur] Marked-card storage is unavailable", error);
 				nsfwh.markedCards = new Set();
 				nsfwh.storageLoaded = true;
-				nsfwh.markedVersion += 1;
 				return [];
 			} finally {
 				nsfwh.storageLoadPromise = null;
@@ -89,9 +82,8 @@ const nsfwh = {
 		} else {
 			nsfwh.markedCards.delete(key);
 		}
-		nsfwh.markedVersion += 1;
 
-		nsfwh.applyMarkedCards(true);
+		nsfwh.applyMarkedCards();
 
 		const response = await fetch(nsfwh.endpoints.marked, {
 			method: "POST",
@@ -101,99 +93,68 @@ const nsfwh = {
 		const data = await response.json();
 		if(!response.ok || !data.ok) throw new Error(data.error || response.statusText);
 		nsfwh.markedCards = new Set(Array.isArray(data.marked) ? data.marked : []);
-		nsfwh.markedVersion += 1;
-		nsfwh.applyMarkedCards(true);
+		nsfwh.applyMarkedCards();
 	},
 
-	cardSignature: (cards) => {
-		if(!cards.length) return "0";
-		return cards.map(card => {
-			const preview = nsfwh.cardPreviewElement(card);
-			const previewSrc = preview ? nsfwh.normalizePreviewSource(preview) : "";
-			return `${card.closest(".extra-network-cards[id]")?.id || ""}:${nsfwh.keyFromCard(card)}:${previewSrc}`;
-		}).join("|");
-	},
+	cardInViewport: (card) => {
+		const rect = card.getBoundingClientRect();
+		if(rect.width <= 0 || rect.height <= 0) return false;
 
-	cardPreviewElement: (card) => {
-		return Array.from(card.children).find(child => {
-			return child.classList && child.classList.contains("preview");
-		}) || null;
-	},
+		let top = 0;
+		let left = 0;
+		let bottom = window.innerHeight || document.documentElement.clientHeight;
+		let right = window.innerWidth || document.documentElement.clientWidth;
+		const scroller = card.closest(".extra-network-cards");
 
-	originalPreviewUrlFromBlurred: (src) => {
-		try {
-			const url = new URL(src, window.location.href);
-			if(!url.pathname.endsWith("/nsfw-card-blur/blurred-preview")) return "";
-
-			const filename = url.searchParams.get("filename");
-			if(!filename) return "";
-
-			const params = new URLSearchParams();
-			params.set("filename", filename);
-			const mtime = url.searchParams.get("mtime");
-			if(mtime) params.set("mtime", mtime);
-
-			return `./sd_extra_networks/thumb?${params.toString()}`;
-		} catch(error) {
-			return "";
-		}
-	},
-
-	normalizePreviewSource: (preview) => {
-		const currentSrc = preview.getAttribute("src") || "";
-		const restoredSrc = nsfwh.originalPreviewUrlFromBlurred(currentSrc);
-		if(restoredSrc) {
-			preview.setAttribute("src", restoredSrc);
-			preview.dataset.nsfwOriginalSrc = restoredSrc;
-			preview.dataset.nsfwBlurredSrc = "";
-			return restoredSrc;
+		if(scroller) {
+			const scrollerRect = scroller.getBoundingClientRect();
+			top = Math.max(top, scrollerRect.top);
+			left = Math.max(left, scrollerRect.left);
+			bottom = Math.min(bottom, scrollerRect.bottom);
+			right = Math.min(right, scrollerRect.right);
 		}
 
-		return currentSrc;
+		return rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
 	},
 
-	cleanupCardPreview: (card) => {
-		const preview = nsfwh.cardPreviewElement(card);
-		if(preview) {
-			nsfwh.normalizePreviewSource(preview);
-			delete preview.dataset.nsfwOriginalSrc;
-			delete preview.dataset.nsfwBlurredSrc;
-		}
-
-		card.removeAttribute("data-nsfw-blurred-preview-active");
-		card.removeAttribute("data-nsfw-blur-fallback");
-		card.style.removeProperty("--nsfw-card-blurred-preview");
+	updateCardViewport: (card, visible = null) => {
+		const isVisible = visible === null ? nsfwh.cardInViewport(card) : visible;
+		card.toggleAttribute("data-nsfw-card-visible", isVisible);
 	},
 
-	updateCardPreview: (card, marked) => {
-		nsfwh.cleanupCardPreview(card);
+	getViewportObserver: () => {
+		if(!("IntersectionObserver" in window)) return null;
+		if(nsfwh.viewportObserver) return nsfwh.viewportObserver;
 
-		card.removeAttribute("data-nsfw-card-cover");
-	},
-
-	applyMarkedCards: (force = false) => {
-		nsfwh.removeLegacyBlurredOverlays();
-		const cards = Array.from(gradioApp().querySelectorAll(".extra-network-pane .card[data-name]"));
-		const signature = nsfwh.cardSignature(cards);
-		if(
-			!force &&
-			signature === nsfwh.lastCardSignature &&
-			nsfwh.markedVersion === nsfwh.lastAppliedMarkedVersion &&
-			nsfwh.currentViewOption === nsfwh.lastAppliedViewOption
-		) {
-			return;
-		}
-
-		cards.forEach(card => {
-			const key = nsfwh.keyFromCard(card);
-			const marked = nsfwh.markedCards.has(key);
-			card.toggleAttribute("data-nsfw-card-blur", marked);
-			nsfwh.updateCardPreview(card, marked);
+		nsfwh.viewportObserver = new IntersectionObserver(entries => {
+			entries.forEach(entry => {
+				nsfwh.updateCardViewport(entry.target, entry.isIntersecting);
+			});
+		}, {
+			root: null,
+			rootMargin: "120px 0px",
+			threshold: 0.01,
 		});
 
-		nsfwh.lastCardSignature = signature;
-		nsfwh.lastAppliedMarkedVersion = nsfwh.markedVersion;
-		nsfwh.lastAppliedViewOption = nsfwh.currentViewOption;
+		return nsfwh.viewportObserver;
+	},
+
+	observeCardVisibility: (card) => {
+		nsfwh.updateCardViewport(card);
+
+		const observer = nsfwh.getViewportObserver();
+		if(observer && !nsfwh.observedCards.has(card)) {
+			observer.observe(card);
+			nsfwh.observedCards.add(card);
+		}
+	},
+
+	applyMarkedCards: () => {
+		gradioApp().querySelectorAll(".extra-network-pane .card[data-name]").forEach(card => {
+			const key = nsfwh.keyFromCard(card);
+			card.toggleAttribute("data-nsfw-card-blur", nsfwh.markedCards.has(key));
+			nsfwh.observeCardVisibility(card);
+		});
 	},
 
 	updateEditorToggle: (editor) => {
@@ -274,53 +235,6 @@ const nsfwh = {
 
 			nsfwh.updateEditorToggle(editor);
 		});
-	},
-
-	sanitizeStandalonePreviews: () => {
-		gradioApp().querySelectorAll(".standalone-card-preview .preview").forEach(preview => {
-			nsfwh.normalizePreviewSource(preview);
-		});
-	},
-
-	removeLegacyBlurredOverlays: () => {
-		gradioApp().querySelectorAll(".extra-network-pane .card > .nsfw-card-blurred-preview").forEach(overlay => {
-			overlay.remove();
-		});
-	},
-
-	scheduleRefresh: (force = false) => {
-		if(force) {
-			nsfwh.lastCardSignature = "";
-		}
-		if(nsfwh.refreshQueued) return;
-
-		nsfwh.refreshQueued = true;
-		window.requestAnimationFrame(async () => {
-			nsfwh.refreshQueued = false;
-			nsfwh.ensureControlButtons();
-			nsfwh.enhanceMetadataEditors();
-			nsfwh.removeLegacyBlurredOverlays();
-			nsfwh.sanitizeStandalonePreviews();
-			await nsfwh.loadMarkedCards();
-			nsfwh.applyMarkedCards(force);
-			nsfwh.sanitizeStandalonePreviews();
-			nsfwh.enhanceMetadataEditors();
-		});
-	},
-
-	startObserver: () => {
-		if(nsfwh.observerStarted) return;
-
-		const root = gradioApp();
-		if(!root) return;
-
-		const observer = new MutationObserver(mutations => {
-			if(mutations.some(mutation => mutation.addedNodes.length || mutation.removedNodes.length || mutation.type === "attributes")) {
-				nsfwh.scheduleRefresh();
-			}
-		});
-		observer.observe(root, {childList: true, subtree: true, attributes: true, attributeFilter: ["src", "data-name", "id"]});
-		nsfwh.observerStarted = true;
 	},
 
 	extraNetworksControlNSFWModalOpenOnClick: (event) => {
@@ -424,8 +338,12 @@ const nsfwh = {
 };
 
 onAfterUiUpdate(function() {
-	nsfwh.startObserver();
-	nsfwh.scheduleRefresh();
+	nsfwh.ensureControlButtons();
+	nsfwh.enhanceMetadataEditors();
+	nsfwh.loadMarkedCards().then(() => {
+		nsfwh.applyMarkedCards();
+		nsfwh.enhanceMetadataEditors();
+	});
 });
 
 if(typeof onOptionsAvailable === "function") {
