@@ -4,8 +4,6 @@ A small Stable Diffusion WebUI Forge / A1111 Extra Networks extension for blurri
 
 This extension does not analyze generated images and does not filter your output images. It only affects thumbnails shown in the Extra Networks card browser, such as LoRA cards.
 
-![Per-card blur toggle](images/fncbgif003.png)
-
 ## Features
 
 - Blur, hide, or show marked Extra Networks card thumbnails.
