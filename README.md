@@ -40,7 +40,7 @@ Marked cards use a lighter real-time CSS filter (`blur(8px) brightness(0.24) sat
 
 Hovering over a blurred card temporarily reveals the original thumbnail, so browsing keeps the old behavior while avoiding the cost of strongly blurring many thumbnails during scroll.
 
-![Lightweight real-time blur preview](images/fncbnew001.png) *new
+![Lightweight real-time blur preview](images/fncbnew001.png)  ❮❮ new 
 
 ![Blur mode](images/fncbgif002.gif)
 
