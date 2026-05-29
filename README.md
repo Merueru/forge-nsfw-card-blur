@@ -42,7 +42,7 @@ Hovering over a blurred card temporarily reveals the original thumbnail, so brow
 
 ![Lightweight real-time blur preview](images/fncbnew001.png)  
 
-ꜜꜜ Origianl | New ꜛꜛ
+⭣⭣ Origianl | New ⭡⭡
 
 ![Blur mode](images/fncbgif002.gif)
 
